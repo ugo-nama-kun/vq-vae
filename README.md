@@ -8,3 +8,5 @@ Van Den Oord, Aaron, and Oriol Vinyals. "Neural discrete representation learning
 ### One-more-thing
 
 The original VQ-VAE used the squared error in the latent embedding selection $z_q$. The implementation of this distance can be complicated and hence tale time to compute. Then we additionally implemented the cosine distance-based VQ-VAE. This seemingly works well and very efficient to compute.
+
+![image](https://user-images.githubusercontent.com/1684732/202863684-1709e49d-51fe-41ad-9357-64461252416e.png)
