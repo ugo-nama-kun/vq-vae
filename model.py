@@ -431,7 +431,7 @@ class ConvAE(nn.Module):
 		z = self.e_cnn(x)
 		x_pred = self.d_cnn(z)
 		loss = torch.sum((x - x_pred) ** 2) / x.shape[0]
-		return x_pred, z, loss
+		return x_pred, z, loss, None
 
 
 class ConvVAE(nn.Module):
@@ -501,7 +501,7 @@ class ConvVAE(nn.Module):
 		loss += kl
 		loss /= x.shape[0]
 		
-		return x_pred, z, loss
+		return x_pred, z, loss, None
 
 
 class ConvVQVAE(nn.Module):
@@ -584,7 +584,7 @@ class ConvVQVAE(nn.Module):
 		loss += 0.25 * torch.sum((z_e - z_q.detach()) ** 2)
 		loss /= x.shape[0]
 		
-		return x_pred, z_discrete, loss
+		return x_pred, z_discrete, loss, z_index
 
 
 class ConvVQVAECos(nn.Module):
@@ -663,4 +663,4 @@ class ConvVQVAECos(nn.Module):
 		loss += 0.25 * torch.sum((z_e - z_q.detach()) ** 2)
 		loss /= x.shape[0]
 		
-		return x_pred, z_discrete, loss
+		return x_pred, z_discrete, loss, z_index

@@ -36,8 +36,8 @@ def get_batch(batch_size):
 
 if __name__ == '__main__':
     
-    dim_latent = 512
-    n_category = 512
+    dim_latent = 20
+    n_category = 50
     # n_query = 10
     
     # model = ConvAE(dim_latent=dim_latent)
@@ -58,7 +58,7 @@ if __name__ == '__main__':
         
         x = get_batch(64)
         
-        _, _, loss = model(x)
+        _, _, loss, _ = model(x)
         
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
@@ -73,26 +73,26 @@ if __name__ == '__main__':
             
             with torch.no_grad():
                 x_test = get_batch(1)
-                x_pred, z, _ = model(x_test)
+                x_pred, z, _, z_index = model(x_test)
             
             plt.clf()
             
-            plt.subplot(411)
+            plt.subplot(221)
             plt.imshow(einops.rearrange(x_test, "b c h w -> h (b w) c").numpy())
             plt.title("input")
             
-            plt.subplot(412)
+            plt.subplot(222)
             if isinstance(model, ConvAE) or isinstance(model, ConvVAE):
                 plt.imshow(z, cmap="gray")
             elif isinstance(model, ConvVQVAE) or isinstance(model, ConvVQVAECos):
-                plt.imshow(einops.rearrange(z[0], "h w c -> h (w c)").numpy(), cmap="gray")
+                plt.imshow((z_index[0]).numpy() / 512, cmap="gist_ncar")
             plt.title("latent")
             
-            plt.subplot(413)
+            plt.subplot(223)
             plt.imshow(einops.rearrange(x_pred, "b c h w -> h (b w) c").numpy())
             plt.title("reconstruction")
             
-            plt.subplot(414)
+            plt.subplot(224)
             plt.plot(hist_loss)
             plt.yscale("log")
             plt.title("Loss")
