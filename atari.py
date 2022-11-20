@@ -36,8 +36,8 @@ def get_batch(batch_size):
 
 if __name__ == '__main__':
     
-    dim_latent = 10  # 512
-    n_category = 20  # 512
+    dim_latent = 20  # 256
+    n_category = 100  # 512
     
     # model = ConvAE(dim_latent=dim_latent)
     # model = ConvVAE(dim_latent=dim_latent)
@@ -84,7 +84,7 @@ if __name__ == '__main__':
             if isinstance(model, ConvAE) or isinstance(model, ConvVAE):
                 plt.imshow(z, cmap="gray")
             elif isinstance(model, ConvVQVAE) or isinstance(model, ConvVQVAECos):
-                plt.imshow((z_index[0]).numpy() / 512, cmap="nipy_spectral")
+                plt.imshow((z_index[0]).numpy() / n_category, cmap="nipy_spectral")
             plt.title("latent")
             
             plt.subplot(223)

@@ -520,10 +520,10 @@ class ConvVQVAE(nn.Module):
 			nn.GELU(),
 			BasicBlock(in_channels=32, channels=32),
 			nn.GELU(),
-			nn.Dropout2d(),
+			nn.Dropout2d(0.1),
 			BasicBlock(in_channels=32, channels=32),
 			nn.GELU(),
-			nn.Dropout2d(),
+			nn.Dropout2d(0.1),
 			nn.Conv2d(32, self.dim_latent, 1, stride=1, bias=False),  #
 		)
 		
@@ -532,10 +532,10 @@ class ConvVQVAE(nn.Module):
 			nn.GELU(),
 			BasicBlock(in_channels=32, channels=32),
 			nn.GELU(),
-			nn.Dropout2d(),
+			nn.Dropout2d(0.1),
 			BasicBlock(in_channels=32, channels=32),
 			nn.GELU(),
-			nn.Dropout2d(),
+			nn.Dropout2d(0.1),
 			nn.ConvTranspose2d(32, 32, 3, stride=2, padding=0, output_padding=0, bias=False),
 			nn.GELU(),
 			nn.ConvTranspose2d(32, 3, 3, stride=2, padding=2, output_padding=1, bias=False),
