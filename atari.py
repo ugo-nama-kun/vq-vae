@@ -41,8 +41,8 @@ if __name__ == '__main__':
     
     # model = ConvAE(dim_latent=dim_latent)
     # model = ConvVAE(dim_latent=dim_latent)
-    model = ConvVQVAE(dim_latent=dim_latent, n_category=n_category)
-    # model = ConvVQVAECos(dim_latent=dim_latent, n_category=n_category)
+    # model = ConvVQVAE(dim_latent=dim_latent, n_category=n_category)
+    model = ConvVQVAECos(dim_latent=dim_latent, n_category=n_category)
 
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=0.003)
     
@@ -84,7 +84,7 @@ if __name__ == '__main__':
             if isinstance(model, ConvAE) or isinstance(model, ConvVAE):
                 plt.imshow(z, cmap="gray")
             elif isinstance(model, ConvVQVAE) or isinstance(model, ConvVQVAECos):
-                plt.imshow((z_index[0]).numpy() / 512, cmap="gist_ncar")
+                plt.imshow((z_index[0]).numpy() / 512, cmap="nipy_spectral")
             plt.title("latent")
             
             plt.subplot(223)
