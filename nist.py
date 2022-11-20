@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn import datasets
 
-from model import AE, MinVQVAE, MinVQVAE1D, MinVQVAECos
+from model import AE, MinVQVAE, MinVQVAE_MultiQuery, MinVQVAE_Cos_MultiQuery, MinVQVAE_Cos
 
 import torch
 import einops
@@ -39,14 +39,15 @@ if __name__ == '__main__':
     
     print(nist_handle.get(0))
     
-    dim_latent = 10
-    n_category = 5
+    dim_latent = 20
+    n_category = 20
     n_query = 7
     
     # model = AE(input_dim=64, dim_latent=dim_latent * n_category)
-    # model = MinVQVAE1D(input_dim=64, dim_latent=dim_latent, n_category=n_category)
-    # model = MinVQVAE(input_dim=64, dim_latent=dim_latent, n_category=n_category, n_query=n_query)
-    model = MinVQVAECos(input_dim=64, dim_latent=dim_latent, n_category=n_category, n_query=n_query)
+    model = MinVQVAE(input_dim=64, dim_latent=dim_latent, n_category=n_category)
+    # model = MinVQVAE_Cos(input_dim=64, dim_latent=dim_latent, n_category=n_category)
+    # model = MinVQVAE_MultiQuery(input_dim=64, dim_latent=dim_latent, n_category=n_category, n_query=n_query)
+    # model = MinVQVAE_Cos_MultiQuery(input_dim=64, dim_latent=dim_latent, n_category=n_category, n_query=n_query)
 
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=0.003)
     
@@ -87,9 +88,9 @@ if __name__ == '__main__':
             plt.subplot(412)
             if isinstance(model, AE):
                 plt.imshow(einops.rearrange(z, "b (h w) -> h (b w)", h=n_category, w=dim_latent).numpy(), cmap="gray")
-            elif isinstance(model, MinVQVAE1D):
-                plt.imshow(einops.rearrange(z, "b (h w) -> h (b w)", h=n_category, w=1).numpy(), cmap="gray")
-            elif isinstance(model, MinVQVAE) or isinstance(model, MinVQVAECos):
+            elif isinstance(model, MinVQVAE) or isinstance(model, MinVQVAE_Cos):
+                plt.imshow(einops.rearrange(z, "b (h w) -> h (b w)", h=n_category, w=1).numpy().transpose(), cmap="gray")
+            elif isinstance(model, MinVQVAE_MultiQuery) or isinstance(model, MinVQVAE_Cos_MultiQuery):
                 plt.imshow(einops.rearrange(z, "b h w -> h (b w)").numpy(), cmap="gray")
             plt.title("latent")
 

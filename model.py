@@ -102,9 +102,9 @@ class AE(nn.Module):
 		return x_pred, z, loss
 
 
-class MinVQVAE1D(nn.Module):
+class MinVQVAE(nn.Module):
 	def __init__(self, input_dim, n_category, dim_latent, n_hidden=100):
-		super(MinVQVAE1D, self).__init__()
+		super(MinVQVAE, self).__init__()
 		
 		self.n_category = n_category
 		
@@ -171,9 +171,76 @@ class MinVQVAE1D(nn.Module):
 		return x_pred, z_discrete, loss
 
 
-class MinVQVAE(nn.Module):
+class MinVQVAE_Cos(nn.Module):
+	def __init__(self, input_dim, n_category, dim_latent, n_hidden=100):
+		super(MinVQVAE_Cos, self).__init__()
+		
+		self.n_category = n_category
+		
+		self.embed_pool = nn.Parameter(torch.randn((n_category, dim_latent), dtype=torch.float32))
+		
+		self.encoder = nn.Sequential(
+			nn.Linear(input_dim, n_hidden),
+			nn.GELU(),
+			nn.Dropout(p=0.5),
+			nn.Linear(n_hidden, n_hidden),
+			nn.GELU(),
+			nn.Dropout(p=0.5),
+			nn.Linear(n_hidden, dim_latent),
+		)
+		
+		self.decoder = nn.Sequential(
+			nn.Linear(dim_latent, n_hidden),
+			nn.GELU(),
+			nn.Dropout(p=0.5),
+			nn.Linear(n_hidden, n_hidden),
+			nn.GELU(),
+			nn.Dropout(p=0.5),
+			nn.Linear(n_hidden, input_dim),
+			nn.Sigmoid()
+		)
+		
+		nn.init.orthogonal_(self.embed_pool, gain=1)
+		
+		for l in self.encoder:
+			if isinstance(l, nn.Linear):
+				nn.init.orthogonal_(l.weight, gain=1)
+				nn.init.zeros_(l.bias)
+		
+		for l in self.decoder:
+			if isinstance(l, nn.Linear):
+				nn.init.orthogonal_(l.weight, gain=1)
+				nn.init.zeros_(l.bias)
+	
+	def forward(self, x):
+		z_e = self.encoder(x)
+		
+		with torch.no_grad():
+			# Cosine distance
+			factor = torch.einsum("c d, b d -> b c", self.embed_pool, z_e)
+			
+			z_index = torch.argmax(factor, dim=1)
+			
+			z_discrete = nn.functional.one_hot(z_index, self.n_category)
+			
+		z_q = self.embed_pool[z_index]
+		
+		# Straight-through estimator
+		z_ss = z_e - z_e.detach() + z_q.detach()
+		
+		x_pred = self.decoder(z_ss)
+		
+		loss = torch.sum((x - x_pred) ** 2)
+		loss += torch.sum((z_e.detach() - z_q) ** 2)
+		loss += 0.25 * torch.sum((z_e - z_q.detach()) ** 2)
+		loss /= x.shape[0]
+		
+		return x_pred, z_discrete, loss
+
+
+class MinVQVAE_MultiQuery(nn.Module):
 	def __init__(self, input_dim, n_category, dim_latent, n_query, n_hidden=100):
-		super(MinVQVAE, self).__init__()
+		super(MinVQVAE_MultiQuery, self).__init__()
 		
 		self.n_category = n_category
 		self.dim_latent = dim_latent
@@ -245,9 +312,9 @@ class MinVQVAE(nn.Module):
 		return x_pred, z_discrete, loss
 
 
-class MinVQVAECos(nn.Module):
+class MinVQVAE_Cos_MultiQuery(nn.Module):
 	def __init__(self, input_dim, n_category, dim_latent, n_query, n_hidden=100):
-		super(MinVQVAECos, self).__init__()
+		super(MinVQVAE_Cos_MultiQuery, self).__init__()
 		
 		self.n_category = n_category
 		self.dim_latent = dim_latent
@@ -373,9 +440,9 @@ class ConvVAE(nn.Module):
 		super(ConvVAE, self).__init__()
 		
 		self.e_cnn = nn.Sequential(
-			nn.Conv2d(3, 32, 3, stride=2, padding=1),
+			nn.Conv2d(3, 32, 3, stride=2, padding=1, bias=False),
 			nn.GELU(),
-			nn.Conv2d(32, 32, 3, stride=2, padding=1),
+			nn.Conv2d(32, 32, 3, stride=2, padding=1, bias=False),
 			nn.GELU(),
 			BasicBlock(in_channels=32, channels=32),
 			nn.GELU(),
@@ -397,9 +464,9 @@ class ConvVAE(nn.Module):
 			nn.GELU(),
 			BasicBlock(in_channels=32, channels=32),
 			nn.GELU(),
-			nn.ConvTranspose2d(32, 32, 3, stride=2, padding=0, output_padding=0),
+			nn.ConvTranspose2d(32, 32, 3, stride=2, padding=0, output_padding=0, bias=False),
 			nn.GELU(),
-			nn.ConvTranspose2d(32, 3, 3, stride=2, padding=2, output_padding=1),
+			nn.ConvTranspose2d(32, 3, 3, stride=2, padding=2, output_padding=1, bias=False),
 			nn.Sigmoid()
 		)
 		
@@ -435,3 +502,165 @@ class ConvVAE(nn.Module):
 		loss /= x.shape[0]
 		
 		return x_pred, z, loss
+
+
+class ConvVQVAE(nn.Module):
+	def __init__(self, n_category, dim_latent):
+		super(ConvVQVAE, self).__init__()
+		
+		self.n_category = n_category
+		self.dim_latent = dim_latent
+		
+		self.embed_pool = nn.Parameter(torch.randn((n_category, dim_latent), dtype=torch.float32))
+		
+		self.e_cnn = nn.Sequential(
+			nn.Conv2d(3, 32, 3, stride=2, padding=1, bias=False),  # 84x84x3 -> 42x42x32
+			nn.GELU(),
+			nn.Dropout2d(),
+			nn.Conv2d(32, 32, 3, stride=2, padding=1, bias=False),  # 42x42x32 -> 21x21x32
+			nn.GELU(),
+			nn.Dropout2d(),
+			BasicBlock(in_channels=32, channels=32),
+			nn.GELU(),
+			BasicBlock(in_channels=32, channels=32),
+			nn.GELU(),
+			nn.Conv2d(32, self.dim_latent, 1, stride=1, bias=False),  #
+		)
+		
+		self.d_cnn = nn.Sequential(
+			BasicBlock(in_channels=self.dim_latent, channels=32),
+			nn.GELU(),
+			BasicBlock(in_channels=32, channels=32),
+			nn.GELU(),
+			nn.ConvTranspose2d(32, 32, 3, stride=2, padding=0, output_padding=0, bias=False),
+			nn.GELU(),
+			nn.ConvTranspose2d(32, 3, 3, stride=2, padding=2, output_padding=1, bias=False),
+			nn.Sigmoid()
+		)
+		
+		nn.init.orthogonal_(self.embed_pool, gain=1)
+		
+		for l in self.e_cnn:
+			if isinstance(l, nn.Linear) or isinstance(l, nn.Conv2d):
+				nn.init.orthogonal_(l.weight, gain=1)
+				if l.bias is not None:
+					nn.init.zeros_(l.bias)
+		
+		for l in self.d_cnn:
+			if isinstance(l, nn.Linear) or isinstance(l, nn.ConvTranspose2d):
+				nn.init.orthogonal_(l.weight, gain=1)
+				if l.bias is not None:
+					nn.init.zeros_(l.bias)
+		
+		nn.init.orthogonal_(self.embed_pool, gain=1)
+	
+	def forward(self, x):
+		z_e = self.e_cnn(x)  # (batch, dim_latent, h, w)
+		z_tmp = einops.rearrange(z_e, "b d h w -> b h w d")
+		
+		with torch.no_grad():
+			factor = torch.zeros((x.shape[0], self.n_category,) + z_tmp.shape[1:3])
+			for n in range(x.shape[0]):
+				for k in range(self.n_category):
+					factor[n, k] = torch.norm(z_tmp[n] - self.embed_pool[k], dim=2)
+			
+			factor = einops.rearrange(factor, "b d h w -> b h w d")
+			z_index = torch.argmin(factor, dim=3)
+			
+			z_discrete = nn.functional.one_hot(z_index, self.n_category)
+		
+		# print("z_index: ", z_index.shape)
+		z_q = self.embed_pool[z_index]
+		z_q = einops.rearrange(z_q, "b h w d -> b d h w")
+
+		# Straight-through estimator
+		# print("z_e: ", z_e.shape, ", z_q: ", z_q.shape)
+		z_ss = z_e - z_e.detach() + z_q.detach()
+		
+		x_pred = self.d_cnn(z_ss)
+		
+		loss = torch.sum((x - x_pred) ** 2)
+		loss += torch.sum((z_e.detach() - z_q) ** 2)
+		loss += 0.25 * torch.sum((z_e - z_q.detach()) ** 2)
+		loss /= x.shape[0]
+		
+		return x_pred, z_discrete, loss
+
+
+class ConvVQVAECos(nn.Module):
+	def __init__(self, n_category, dim_latent):
+		super(ConvVQVAECos, self).__init__()
+		
+		self.n_category = n_category
+		self.dim_latent = dim_latent
+		
+		self.embed_pool = nn.Parameter(torch.randn((n_category, dim_latent), dtype=torch.float32))
+		
+		self.e_cnn = nn.Sequential(
+			nn.Conv2d(3, 32, 3, stride=2, padding=1, bias=False),  # 84x84x3 -> 42x42x32
+			nn.GELU(),
+			nn.Dropout2d(),
+			nn.Conv2d(32, 32, 3, stride=2, padding=1, bias=False),  # 42x42x32 -> 21x21x32
+			nn.GELU(),
+			nn.Dropout2d(),
+			BasicBlock(in_channels=32, channels=32),
+			nn.GELU(),
+			BasicBlock(in_channels=32, channels=32),
+			nn.GELU(),
+			nn.Conv2d(32, self.dim_latent, 1, stride=1, bias=False),  #
+		)
+		
+		self.d_cnn = nn.Sequential(
+			BasicBlock(in_channels=self.dim_latent, channels=32),
+			nn.GELU(),
+			BasicBlock(in_channels=32, channels=32),
+			nn.GELU(),
+			nn.ConvTranspose2d(32, 32, 3, stride=2, padding=0, output_padding=0, bias=False),
+			nn.GELU(),
+			nn.ConvTranspose2d(32, 3, 3, stride=2, padding=2, output_padding=1, bias=False),
+			nn.Sigmoid()
+		)
+		
+		nn.init.orthogonal_(self.embed_pool, gain=1)
+		
+		for l in self.e_cnn:
+			if isinstance(l, nn.Linear) or isinstance(l, nn.Conv2d):
+				nn.init.orthogonal_(l.weight, gain=1)
+				if l.bias is not None:
+					nn.init.zeros_(l.bias)
+		
+		for l in self.d_cnn:
+			if isinstance(l, nn.Linear) or isinstance(l, nn.ConvTranspose2d):
+				nn.init.orthogonal_(l.weight, gain=1)
+				if l.bias is not None:
+					nn.init.zeros_(l.bias)
+		
+		nn.init.orthogonal_(self.embed_pool, gain=1)
+	
+	def forward(self, x):
+		z_e = self.e_cnn(x)  # (batch, dim_latent, h, w)
+		
+		with torch.no_grad():
+			# Cosine distance
+			factor = torch.einsum("c d, b d h w -> b h w c", self.embed_pool, z_e)
+			
+			z_index = torch.argmax(factor, dim=3)
+			
+			z_discrete = nn.functional.one_hot(z_index, self.n_category)
+		
+		# print("z_index: ", z_index.shape)
+		z_q = self.embed_pool[z_index]
+		z_q = einops.rearrange(z_q, "b h w d -> b d h w")
+		
+		# Straight-through estimator
+		# print("z_e: ", z_e.shape, ", z_q: ", z_q.shape)
+		z_ss = z_e - z_e.detach() + z_q.detach()
+		
+		x_pred = self.d_cnn(z_ss)
+		
+		loss = torch.sum((x - x_pred) ** 2)
+		loss += torch.sum((z_e.detach() - z_q) ** 2)
+		loss += 0.25 * torch.sum((z_e - z_q.detach()) ** 2)
+		loss /= x.shape[0]
+		
+		return x_pred, z_discrete, loss

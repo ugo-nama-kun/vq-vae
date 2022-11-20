@@ -7,7 +7,7 @@ from torchvision import transforms
 import matplotlib.pyplot as plt
 import matplotlib
 
-from model import ConvAE, ConvVAE
+from model import ConvAE, ConvVAE, ConvVQVAE, ConvVQVAECos
 
 matplotlib.use('TkAgg')
 
@@ -36,13 +36,16 @@ def get_batch(batch_size):
 
 if __name__ == '__main__':
     
-    dim_latent = 10
-    n_category = 5
-    n_query = 7
+    dim_latent = 512
+    n_category = 512
+    # n_query = 10
     
-    model = ConvAE(dim_latent=dim_latent * n_category)
-    
-    optimizer = torch.optim.AdamW(params=model.parameters(), lr=0.003)
+    # model = ConvAE(dim_latent=dim_latent)
+    # model = ConvVAE(dim_latent=dim_latent)
+    model = ConvVQVAE(dim_latent=dim_latent, n_category=n_category)
+    # model = ConvVQVAECos(dim_latent=dim_latent, n_category=n_category)
+
+    optimizer = torch.optim.AdamW(params=model.parameters(), lr=0.001)
     
     n_itr = 10000
     
@@ -69,7 +72,7 @@ if __name__ == '__main__':
             model.eval()
             
             with torch.no_grad():
-                x_test = get_batch(5)
+                x_test = get_batch(1)
                 x_pred, z, _ = model(x_test)
             
             plt.clf()
@@ -80,11 +83,9 @@ if __name__ == '__main__':
             
             plt.subplot(412)
             if isinstance(model, ConvAE) or isinstance(model, ConvVAE):
-                plt.imshow(einops.rearrange(z, "b (h w) -> h (b w)", h=n_category, w=dim_latent).numpy(), cmap="gray")
-            # elif isinstance(model, MinVQVAE1D):
-            #     plt.imshow(einops.rearrange(z, "b (h w) -> h (b w)", h=n_category, w=1).numpy(), cmap="gray")
-            # elif isinstance(model, MinVQVAE) or isinstance(model, MinVQVAECos):
-            #     plt.imshow(einops.rearrange(z, "b h w -> h (b w)").numpy(), cmap="gray")
+                plt.imshow(z, cmap="gray")
+            elif isinstance(model, ConvVQVAE) or isinstance(model, ConvVQVAECos):
+                plt.imshow(einops.rearrange(z[0], "h w c -> h (w c)").numpy(), cmap="gray")
             plt.title("latent")
             
             plt.subplot(413)
