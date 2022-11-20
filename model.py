@@ -1,6 +1,7 @@
 import einops
 import torch
 from torch import nn
+from einops.layers.torch import Rearrange
 
 
 # from https://pystyle.info/pytorch-resnet/
@@ -313,3 +314,124 @@ class MinVQVAECos(nn.Module):
 		loss /= x.shape[0]
 		
 		return x_pred, z_discrete, loss
+
+
+class ConvAE(nn.Module):
+
+	def __init__(self, dim_latent):
+		super(ConvAE, self).__init__()
+
+		self.e_cnn = nn.Sequential(
+			nn.Conv2d(3, 32, 3, stride=2, padding=1),
+			nn.GELU(),
+			nn.Conv2d(32, 32, 3, stride=2, padding=1),
+			nn.GELU(),
+			BasicBlock(in_channels=32, channels=32),
+			nn.GELU(),
+			BasicBlock(in_channels=32, channels=32),
+			nn.GELU(),
+			Rearrange("b c h w -> b (c h w)"),  # flatten
+			nn.Dropout(),
+			nn.Linear(21 * 21 * 32, dim_latent),
+		)
+		
+		self.d_cnn = nn.Sequential(
+			nn.Linear(dim_latent, 21 * 21 * 32),
+			nn.GELU(),
+			nn.Dropout(),
+			Rearrange("b (c h w) -> b c h w", c=32, h=21, w=21),
+			BasicBlock(in_channels=32, channels=32),
+			nn.GELU(),
+			BasicBlock(in_channels=32, channels=32),
+			nn.GELU(),
+			nn.ConvTranspose2d(32, 32, 3, stride=2, padding=0, output_padding=0),
+			nn.GELU(),
+			nn.ConvTranspose2d(32, 3, 3, stride=2, padding=2, output_padding=1),
+			nn.Sigmoid()
+		)
+		
+		for l in self.e_cnn:
+			if isinstance(l, nn.Linear) or isinstance(l, nn.Conv2d):
+				nn.init.orthogonal_(l.weight, gain=1)
+				nn.init.zeros_(l.bias)
+				
+		for l in self.d_cnn:
+			if isinstance(l, nn.Linear) or isinstance(l, nn.ConvTranspose2d):
+				nn.init.orthogonal_(l.weight, gain=1)
+				nn.init.zeros_(l.bias)
+
+	def forward(self, x):
+		z = self.e_cnn(x)
+		x_pred = self.d_cnn(z)
+		loss = torch.sum((x - x_pred) ** 2) / x.shape[0]
+		return x_pred, z, loss
+
+
+class ConvVAE(nn.Module):
+	
+	def __init__(self, dim_latent):
+		super(ConvVAE, self).__init__()
+		
+		self.e_cnn = nn.Sequential(
+			nn.Conv2d(3, 32, 3, stride=2, padding=1),
+			nn.GELU(),
+			nn.Conv2d(32, 32, 3, stride=2, padding=1),
+			nn.GELU(),
+			BasicBlock(in_channels=32, channels=32),
+			nn.GELU(),
+			BasicBlock(in_channels=32, channels=32),
+			nn.GELU(),
+			Rearrange("b c h w -> b (c h w)"),  # flatten
+			nn.Dropout(),
+		)
+		
+		self.e_mean = nn.Linear(21 * 21 * 32, dim_latent)
+		self.e_scale = nn.Linear(21 * 21 * 32, dim_latent)
+
+		self.d_cnn = nn.Sequential(
+			nn.Linear(dim_latent, 21 * 21 * 32),
+			nn.GELU(),
+			nn.Dropout(),
+			Rearrange("b (c h w) -> b c h w", c=32, h=21, w=21),
+			BasicBlock(in_channels=32, channels=32),
+			nn.GELU(),
+			BasicBlock(in_channels=32, channels=32),
+			nn.GELU(),
+			nn.ConvTranspose2d(32, 32, 3, stride=2, padding=0, output_padding=0),
+			nn.GELU(),
+			nn.ConvTranspose2d(32, 3, 3, stride=2, padding=2, output_padding=1),
+			nn.Sigmoid()
+		)
+		
+		for l in self.e_cnn:
+			if isinstance(l, nn.Linear) or isinstance(l, nn.Conv2d):
+				nn.init.orthogonal_(l.weight, gain=1)
+				nn.init.zeros_(l.bias)
+		
+		for l in self.d_cnn:
+			if isinstance(l, nn.Linear) or isinstance(l, nn.ConvTranspose2d):
+				nn.init.orthogonal_(l.weight, gain=1)
+				nn.init.zeros_(l.bias)
+				
+		nn.init.orthogonal_(self.e_mean.weight, gain=1)
+		nn.init.zeros_(self.e_mean.weight)
+
+		nn.init.orthogonal_(self.e_scale.weight, gain=1)
+		nn.init.zeros_(self.e_scale.weight)
+
+	def forward(self, x):
+		h = self.e_cnn(x)
+		
+		mean = self.e_mean(h)
+		scale = torch.exp(self.e_scale(h))
+		z = mean + scale * torch.randn(mean.shape)
+		
+		kl = (scale ** 2 + mean ** 2 - torch.log(scale) - 0.5).sum()
+		
+		x_pred = self.d_cnn(z)
+		
+		loss = torch.sum((x - x_pred) ** 2)
+		loss += kl
+		loss /= x.shape[0]
+		
+		return x_pred, z, loss
