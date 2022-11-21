@@ -14,7 +14,11 @@ matplotlib.use('TkAgg')
 
 import einops
 
+
 env_id = "SpaceInvaders-v4"
+n_itr = 20 # 10000
+dim_latent = 20  # 256
+n_category = 100  # 512
 
 
 data = np.load(f"dataset/{env_id}.npy")
@@ -35,80 +39,68 @@ def get_batch(batch_size):
     return im_batch
 
 
-# im = einops.rearrange(get_batch(5).numpy(), "b c h w -> h (b w) c")
-# plt.imshow(im, interpolation="nearest")
-# plt.pause(0.1)
+# model = ConvAE(dim_latent=dim_latent)
+# model = ConvVAE(dim_latent=dim_latent)
+# model = ConvVQVAE(dim_latent=dim_latent, n_category=n_category)
+model = ConvVQVAECos(dim_latent=dim_latent, n_category=n_category).to(device)
 
+optimizer = torch.optim.AdamW(params=model.parameters(), lr=0.003)
 
-if __name__ == '__main__':
-    
-    dim_latent = 20  # 256
-    n_category = 100  # 512
-    
-    # model = ConvAE(dim_latent=dim_latent)
-    # model = ConvVAE(dim_latent=dim_latent)
-    # model = ConvVQVAE(dim_latent=dim_latent, n_category=n_category)
-    model = ConvVQVAECos(dim_latent=dim_latent, n_category=n_category).to(device)
+plt.figure()
+hist_loss = []
 
-    optimizer = torch.optim.AdamW(params=model.parameters(), lr=0.003)
-    
-    n_itr = 10000
-    
-    plt.figure()
-    hist_loss = []
-    
-    for i in range(n_itr):
-        
-        model.train()
-        
-        x = get_batch(128).to(device)
-        
-        _, _, loss, _ = model(x)
-        
-        optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        optimizer.step()
-        
-        hist_loss.append(loss.item())
-        print(f"{i + 1}-th itr loss: {hist_loss[-1]}")
-        
-        if (i + 1) % 10 == 0:
-            
-            model.eval()
-            
-            with torch.no_grad():
-                x_test = get_batch(1).to(device)
-                x_pred, z, _, z_index = model(x_test)
-                
-            plt.subplot(221)
-            plt.cla()
-            plt.imshow(einops.rearrange(x_test, "b c h w -> h (b w) c").cpu().numpy())
-            plt.title("input")
-            
-            plt.subplot(222)
-            plt.cla()
-            if isinstance(model, ConvAE) or isinstance(model, ConvVAE):
-                plt.imshow(z, cmap="gray")
-            elif isinstance(model, ConvVQVAE) or isinstance(model, ConvVQVAECos):
-                plt.imshow((z_index[0]).cpu().numpy() / n_category, cmap="nipy_spectral")
-            plt.title("latent")
-            
-            plt.subplot(223)
-            plt.cla()
-            plt.imshow(einops.rearrange(x_pred, "b c h w -> h (b w) c").cpu().numpy())
-            plt.title("reconstruction")
-            
-            plt.subplot(224)
-            plt.cla()
-            plt.plot(hist_loss)
-            plt.yscale("log")
-            plt.title("Loss")
-            
-            plt.tight_layout()
-            
-            plt.pause(0.0001)
+for i in range(n_itr):
 
-    os.makedirs("saved_model", exist_ok=True)
-    torch.save(model.state_dict(), f"model_{env_id}")
+    model.train()
 
-    plt.show()
+    x = get_batch(128).to(device)
+
+    _, _, loss, _ = model(x)
+
+    optimizer.zero_grad(set_to_none=True)
+    loss.backward()
+    optimizer.step()
+
+    hist_loss.append(loss.item())
+    print(f"{i + 1}-th itr loss: {hist_loss[-1]}")
+
+    if (i + 1) % 10 == 0:
+
+        model.eval()
+
+        with torch.no_grad():
+            x_test = get_batch(1).to(device)
+            x_pred, z, _, z_index = model(x_test)
+
+        plt.subplot(221)
+        plt.cla()
+        plt.imshow(einops.rearrange(x_test, "b c h w -> h (b w) c").cpu().numpy())
+        plt.title("input")
+
+        plt.subplot(222)
+        plt.cla()
+        if isinstance(model, ConvAE) or isinstance(model, ConvVAE):
+            plt.imshow(z, cmap="gray")
+        elif isinstance(model, ConvVQVAE) or isinstance(model, ConvVQVAECos):
+            plt.imshow((z_index[0]).cpu().numpy() / n_category, cmap="nipy_spectral")
+        plt.title("latent")
+
+        plt.subplot(223)
+        plt.cla()
+        plt.imshow(einops.rearrange(x_pred, "b c h w -> h (b w) c").cpu().numpy())
+        plt.title("reconstruction")
+
+        plt.subplot(224)
+        plt.cla()
+        plt.plot(hist_loss)
+        plt.yscale("log")
+        plt.title("Loss")
+
+        plt.tight_layout()
+
+        plt.pause(0.0001)
+
+os.makedirs("saved_model", exist_ok=True)
+torch.save(model.state_dict(), f"saved_model/vqvae_{env_id}.pth")
+
+plt.show()
