@@ -16,9 +16,9 @@ import einops
 
 
 env_id = "SpaceInvaders-v4"
-n_itr = 20 # 10000
-dim_latent = 20  # 256
-n_category = 100  # 512
+n_itr = 10000
+dim_latent = 256
+n_category = 512
 
 
 data = np.load(f"dataset/{env_id}.npy")
@@ -83,6 +83,8 @@ for i in range(n_itr):
             plt.imshow(z, cmap="gray")
         elif isinstance(model, ConvVQVAE) or isinstance(model, ConvVQVAECos):
             plt.imshow((z_index[0]).cpu().numpy() / n_category, cmap="nipy_spectral")
+        plt.clim(0, 1)
+        plt.colorbar()
         plt.title("latent")
 
         plt.subplot(223)
@@ -101,6 +103,6 @@ for i in range(n_itr):
         plt.pause(0.0001)
 
 os.makedirs("saved_model", exist_ok=True)
-torch.save(model.state_dict(), f"saved_model/vqvae_{env_id}.pth")
+torch.save(model.to("cpu").state_dict(), f"saved_model/vqvae_{env_id}.pth")
 
 plt.show()
