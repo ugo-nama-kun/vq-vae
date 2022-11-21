@@ -1,7 +1,7 @@
 
 import os
 import numpy as np
-import gym
+import gym  # == 0.21.0
 import tqdm
 
 MAX_IMAGES = 10 ** 4
@@ -9,9 +9,8 @@ SKIP = 100
 env_id = "SpaceInvaders-v4"
 
 env = gym.make(env_id, render_mode="rgb_array")
-env.reset()
+img = env.reset()
 
-img = env.render()
 dataset = np.zeros((MAX_IMAGES,) + img.shape)
 
 n = 0
@@ -21,7 +20,7 @@ with tqdm.tqdm(total=MAX_IMAGES) as pbar:
         env.reset()
         done = False
         while not done:
-            obs, r, done, _, _ = env.step(env.action_space.sample())
+            obs, r, done, _ = env.step(env.action_space.sample())
             
             if step % SKIP == 0:
                 img = env.render()
