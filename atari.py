@@ -1,3 +1,4 @@
+import os
 
 import numpy as np
 
@@ -13,8 +14,13 @@ matplotlib.use('TkAgg')
 
 import einops
 
-data = np.load("dataset/Freeway-v4.npy")
+env_id = "SpaceInvaders-v4"
+
+
+data = np.load(f"dataset/{env_id}.npy")
 print(data.shape)
+
+device = torch.device(0 if torch.cuda.is_available() else "cpu")
 
 transform = transforms.Compose([
     transforms.Resize(size=(84, 84)),
@@ -42,7 +48,7 @@ if __name__ == '__main__':
     # model = ConvAE(dim_latent=dim_latent)
     # model = ConvVAE(dim_latent=dim_latent)
     # model = ConvVQVAE(dim_latent=dim_latent, n_category=n_category)
-    model = ConvVQVAECos(dim_latent=dim_latent, n_category=n_category)
+    model = ConvVQVAECos(dim_latent=dim_latent, n_category=n_category).to(device)
 
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=0.003)
     
@@ -55,7 +61,7 @@ if __name__ == '__main__':
         
         model.train()
         
-        x = get_batch(128)
+        x = get_batch(128).to(device)
         
         _, _, loss, _ = model(x)
         
@@ -71,12 +77,12 @@ if __name__ == '__main__':
             model.eval()
             
             with torch.no_grad():
-                x_test = get_batch(1)
+                x_test = get_batch(1).to(device)
                 x_pred, z, _, z_index = model(x_test)
                 
             plt.subplot(221)
             plt.cla()
-            plt.imshow(einops.rearrange(x_test, "b c h w -> h (b w) c").numpy())
+            plt.imshow(einops.rearrange(x_test, "b c h w -> h (b w) c").cpu().numpy())
             plt.title("input")
             
             plt.subplot(222)
@@ -84,12 +90,12 @@ if __name__ == '__main__':
             if isinstance(model, ConvAE) or isinstance(model, ConvVAE):
                 plt.imshow(z, cmap="gray")
             elif isinstance(model, ConvVQVAE) or isinstance(model, ConvVQVAECos):
-                plt.imshow((z_index[0]).numpy() / n_category, cmap="nipy_spectral")
+                plt.imshow((z_index[0]).cpu().numpy() / n_category, cmap="nipy_spectral")
             plt.title("latent")
             
             plt.subplot(223)
             plt.cla()
-            plt.imshow(einops.rearrange(x_pred, "b c h w -> h (b w) c").numpy())
+            plt.imshow(einops.rearrange(x_pred, "b c h w -> h (b w) c").cpu().numpy())
             plt.title("reconstruction")
             
             plt.subplot(224)
@@ -102,4 +108,7 @@ if __name__ == '__main__':
             
             plt.pause(0.0001)
 
-plt.show()
+    os.makedirs("saved_model", exist_ok=True)
+    torch.save(model.state_dict(), f"model_{env_id}")
+
+    plt.show()

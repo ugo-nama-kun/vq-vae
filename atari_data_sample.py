@@ -6,7 +6,8 @@ import tqdm
 
 MAX_IMAGES = 10 ** 4
 SKIP = 100
-env_id = "SpaceInvaders-v4"
+# env_id = "SpaceInvaders-v4"
+env_id = "Freeway-v4"
 
 env = gym.make(env_id, render_mode="rgb_array")
 img = env.reset()
@@ -23,7 +24,7 @@ with tqdm.tqdm(total=MAX_IMAGES) as pbar:
             obs, r, done, _ = env.step(env.action_space.sample())
             
             if step % SKIP == 0:
-                img = env.render()
+                img = env.render("rgb_array")
                 dataset[n] = img
                 n += 1
                 pbar.update(1)
