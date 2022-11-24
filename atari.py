@@ -15,7 +15,7 @@ matplotlib.use('TkAgg')
 import einops
 
 
-env_id = "SpaceInvaders-v4"
+env_id = "Freeway-v4"
 n_itr = 10000
 dim_latent = 256
 n_category = 512
@@ -44,7 +44,7 @@ def get_batch(batch_size):
 # model = ConvVQVAE(dim_latent=dim_latent, n_category=n_category)
 model = ConvVQVAECos(dim_latent=dim_latent, n_category=n_category).to(device)
 
-optimizer = torch.optim.AdamW(params=model.parameters(), lr=0.003)
+optimizer = torch.optim.Adam(params=model.parameters(), lr=0.003)
 
 plt.figure()
 hist_loss = []

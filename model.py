@@ -97,7 +97,7 @@ class AE(nn.Module):
 		z = self.encoder(x)
 		x_pred = self.decoder(z)
 		
-		loss = torch.sum((x - x_pred) ** 2) / x.shape[0]
+		loss = torch.mean((x - x_pred) ** 2) / x.shape[0]
 		
 		return x_pred, z, loss
 
@@ -163,9 +163,9 @@ class MinVQVAE(nn.Module):
 		
 		x_pred = self.decoder(z_ss)
 		
-		loss = torch.sum((x - x_pred) ** 2)
-		loss += torch.sum((z_e.detach() - z_q) ** 2)
-		loss += 0.25 * torch.sum((z_e - z_q.detach()) ** 2)
+		loss = torch.mean((x - x_pred) ** 2)
+		loss += torch.mean((z_e.detach() - z_q) ** 2)
+		loss += 0.25 * torch.mean((z_e - z_q.detach()) ** 2)
 		loss /= x.shape[0]
 		
 		return x_pred, z_discrete, loss
@@ -230,9 +230,9 @@ class MinVQVAE_Cos(nn.Module):
 		
 		x_pred = self.decoder(z_ss)
 		
-		loss = torch.sum((x - x_pred) ** 2)
-		loss += torch.sum((z_e.detach() - z_q) ** 2)
-		loss += 0.25 * torch.sum((z_e - z_q.detach()) ** 2)
+		loss = torch.mean((x - x_pred) ** 2)
+		loss += torch.mean((z_e.detach() - z_q) ** 2)
+		loss += 0.25 * torch.mean((z_e - z_q.detach()) ** 2)
 		loss /= x.shape[0]
 		
 		return x_pred, z_discrete, loss
@@ -304,9 +304,9 @@ class MinVQVAE_MultiQuery(nn.Module):
 		
 		x_pred = self.decoder(z_ss)
 		
-		loss = torch.sum((x - x_pred) ** 2)
-		loss += torch.sum((z_e.detach() - z_q) ** 2)
-		loss += 0.25 * torch.sum((z_e - z_q.detach()) ** 2)
+		loss = torch.mean((x - x_pred) ** 2)
+		loss += torch.mean((z_e.detach() - z_q) ** 2)
+		loss += 0.25 * torch.mean((z_e - z_q.detach()) ** 2)
 		loss /= x.shape[0]
 		
 		return x_pred, z_discrete, loss
@@ -375,9 +375,9 @@ class MinVQVAE_Cos_MultiQuery(nn.Module):
 		
 		x_pred = self.decoder(z_ss)
 		
-		loss = torch.sum((x - x_pred) ** 2)
-		loss += torch.sum((z_e.detach() - z_q) ** 2)
-		loss += 0.25 * torch.sum((z_e - z_q.detach()) ** 2)
+		loss = torch.mean((x - x_pred) ** 2)
+		loss += torch.mean((z_e.detach() - z_q) ** 2)
+		loss += 0.25 * torch.mean((z_e - z_q.detach()) ** 2)
 		loss /= x.shape[0]
 		
 		return x_pred, z_discrete, loss
@@ -430,7 +430,7 @@ class ConvAE(nn.Module):
 	def forward(self, x):
 		z = self.e_cnn(x)
 		x_pred = self.d_cnn(z)
-		loss = torch.sum((x - x_pred) ** 2) / x.shape[0]
+		loss = torch.mean((x - x_pred) ** 2) / x.shape[0]
 		return x_pred, z, loss, None
 
 
@@ -493,12 +493,12 @@ class ConvVAE(nn.Module):
 		scale = torch.exp(self.e_scale(h))
 		z = mean + scale * torch.randn(mean.shape)
 		
-		kl = (scale ** 2 + mean ** 2 - torch.log(scale) - 0.5).sum()
+		kl = (scale ** 2 + mean ** 2 - torch.log(scale) - 0.5).sum(dim=1)
 		
 		x_pred = self.d_cnn(z)
 		
-		loss = torch.sum((x - x_pred) ** 2)
-		loss += kl
+		loss = torch.mean((x - x_pred) ** 2)
+		loss += kl.mean()
 		loss /= x.shape[0]
 		
 		return x_pred, z, loss, None
@@ -581,9 +581,9 @@ class ConvVQVAE(nn.Module):
 		
 		x_pred = self.d_cnn(z_ss)
 		
-		loss = torch.sum((x - x_pred) ** 2)
-		loss += torch.sum((z_e.detach() - z_q) ** 2)
-		loss += 0.25 * torch.sum((z_e - z_q.detach()) ** 2)
+		loss = torch.mean((x - x_pred) ** 2)
+		loss += torch.mean((z_e.detach() - z_q) ** 2)
+		loss += 0.25 * torch.mean((z_e - z_q.detach()) ** 2)
 		loss /= x.shape[0]
 		
 		return x_pred, z_discrete, loss, z_index
@@ -599,29 +599,32 @@ class ConvVQVAECos(nn.Module):
 		self.embed_pool = nn.Parameter(torch.randn((n_category, dim_latent), dtype=torch.float32))
 		
 		self.e_cnn = nn.Sequential(
-			nn.Conv2d(3, 32, 3, stride=2, padding=1, bias=False),  # 84x84x3 -> 42x42x32
+			nn.Conv2d(3, 128, 3, stride=2, padding=1, bias=False),  # 84x84x3 -> 42x42x32
 			nn.GELU(),
-			nn.Conv2d(32, 32, 3, stride=2, padding=1, bias=False),  # 42x42x32 -> 21x21x32
+			nn.Conv2d(128, 128, 3, stride=2, padding=1, bias=False),  # 42x42x32 -> 21x21x32
 			nn.GELU(),
-			BasicBlock(in_channels=32, channels=32),
-			nn.GELU(),
-			nn.Dropout2d(0.1),
-			BasicBlock(in_channels=32, channels=32),
+			BasicBlock(in_channels=128, channels=128),
 			nn.GELU(),
 			nn.Dropout2d(0.1),
-			nn.Conv2d(32, self.dim_latent, 1, stride=1, bias=False),
+			BasicBlock(in_channels=128, channels=128),
+			nn.GELU(),
+			nn.Dropout2d(0.1),
+			nn.Conv2d(128, self.dim_latent, 1, stride=1, bias=False),
 		)
 		
 		self.d_cnn = nn.Sequential(
-			BasicBlock(in_channels=self.dim_latent, channels=32),
+			nn.ConvTranspose2d(self.dim_latent, 128, 1, stride=1, bias=False),
 			nn.GELU(),
 			nn.Dropout2d(0.1),
-			BasicBlock(in_channels=32, channels=32),
+			BasicBlock(in_channels=128, channels=128),
 			nn.GELU(),
 			nn.Dropout2d(0.1),
-			nn.ConvTranspose2d(32, 32, 3, stride=2, padding=0, output_padding=0, bias=False),
+			BasicBlock(in_channels=128, channels=128),
 			nn.GELU(),
-			nn.ConvTranspose2d(32, 3, 3, stride=2, padding=2, output_padding=1, bias=False),
+			nn.Dropout2d(0.1),
+			nn.ConvTranspose2d(128, 128, 3, stride=2, padding=0, output_padding=0, bias=False),
+			nn.GELU(),
+			nn.ConvTranspose2d(128, 3, 3, stride=2, padding=2, output_padding=1, bias=False),
 			nn.Sigmoid()
 		)
 		
@@ -662,9 +665,9 @@ class ConvVQVAECos(nn.Module):
 		
 		x_pred = self.d_cnn(z_ss)
 		
-		loss = torch.sum((x - x_pred) ** 2)
-		loss += torch.sum((z_e.detach() - z_q) ** 2)
-		loss += 0.25 * torch.sum((z_e - z_q.detach()) ** 2)
+		loss = torch.mean((x - x_pred) ** 2)
+		loss += torch.mean((z_e.detach() - z_q) ** 2)
+		loss += 0.25 * torch.mean((z_e - z_q.detach()) ** 2)
 		loss /= x.shape[0]
 		
 		return x_pred, z_discrete, loss, z_index
