@@ -7,7 +7,8 @@ import tqdm
 MAX_IMAGES = 10 ** 4
 SKIP = 100
 # env_id = "SpaceInvaders-v4"
-env_id = "Freeway-v4"
+# env_id = "Freeway-v4"
+env_id = "Seaquest-v4"
 
 env = gym.make(env_id, render_mode="rgb_array")
 img = env.reset()

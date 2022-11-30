@@ -15,7 +15,7 @@ matplotlib.use('TkAgg')
 import einops
 
 
-env_id = "Freeway-v4"
+env_id = "Seaquest-v4"
 n_itr = 10000
 dim_latent = 256
 n_category = 512

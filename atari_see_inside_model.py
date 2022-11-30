@@ -7,7 +7,7 @@ from model import ConvVQVAECos, ConvAE, ConvVAE, ConvVQVAE
 import matplotlib.pyplot as plt
 
 
-env_id = "SpaceInvaders-v4"
+env_id = "Seaquest-v4" # "SpaceInvaders-v4"
 model_path = f"vqvae_{env_id}.pth"
 
 dim_latent = 256
